@@ -1,13 +1,14 @@
-breed [nests nest]
+breed [males male]
+breed [females female]
 
-nests-own [energy prob_success]
-
-; this is the main output of the model
-globals [n_chicks]
+patches-own [noise_intensity]
+males-own [singing mated]
+females-own [mated]
+; consider that every 10 x 10 patches is a home range and there can be up to one couple per home range
 
 to setup
   clear-all
-  setup-nests
+  setup-birds
   setup-patches
   reset-ticks
 end
@@ -18,47 +19,68 @@ to setup-patches
   ]
 end
 
-to setup-nests
-  create-nests n_nests [
-    set energy 0
-    set prob_success start_prob_success
-    set color brown
+to setup-birds
+  create-males n_birds [
     setxy random-pxcor random-pycor
+    set color red
+    set singing TRUE
+    set mated FALSE
   ]
+  create-females n_birds [
+    setxy random-pxcor random-pycor
+    pen-down
+    set color blue
+    set mated FALSE
+  ]
+
 end
 
 to go
-  feeding
   if ticks > 100 [
-    conclude
     stop
   ]
   tick
+  attracted_song
 end
 
+to attracted_song
+  ask females [
+    ; check if there is a male in certain radius that is singing
+    ifelse any? males with [singing = TRUE] in-radius 3 [
+      let closest_signing_male min-one-of males with [singing = TRUE] in-radius 3 [distance myself]
+      if distance closest_signing_male < 1 [
+          ask  closest_signing_male[
+          set mated closest_signing_male
+        ]
+        ask female_bird [
+          set mated male_bird
+        ]
+        stop
+      ]
+      ; goes into the direction of the male
+      face closest_signing_male
+    ]
+    [ ; else go into a random direction
+      right random 360
+    ]
+    forward 1
+  ]
 
-to feeding
-  let hours 8
-  ask nests [
-    set energy energy + random-normal feeding_hour .5
-    right 10 ; visually checking that something is happening
+end
+
+to-report is_available_mating [bird]
+
+end
+; mates male and female
+to mate [male_bird female_bird]
+  ask male_bird [
+    set mated female_bird
+  ]
+  ask female_bird [
+    set mated male_bird
   ]
 end
 
-to conclude
-  set n_chicks 0
-  ask nests [
-    ; they managed to collect enough energy in the season
-    ifelse energy > nest_energy_requirement and random 100 < prob_success [
-        set n_chicks n_chicks + clutch_size
-        set color blue
-    ]
-    [
-        set color red
-    ]
-
-  ]
-end
 
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -93,7 +115,7 @@ BUTTON
 17
 112
 50
-Setup
+setup
 setup
 NIL
 1
@@ -166,11 +188,11 @@ SLIDER
 194
 210
 227
-n_nests
-n_nests
+n_birds
+n_birds
 0
 40
-30.0
+6.0
 1
 1
 NIL
@@ -197,17 +219,6 @@ feeding_hour
 1
 0
 Number
-
-MONITOR
-316
-345
-385
-390
-NIL
-n_chicks
-2
-1
-11
 
 SLIDER
 56
