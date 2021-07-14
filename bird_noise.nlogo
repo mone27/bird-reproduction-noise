@@ -1,13 +1,14 @@
 breed [males male]
 breed [females female]
 
-patches-own [noise_intensity]
+patches-own [noise_level]
 males-own [singing mated]
 females-own [mated]
 ; consider that every 10 x 10 patches is a home range and there can be up to one couple per home range
 
 to setup
   clear-all
+  ;random-seed 1501 ;set random seed for reproducibility
   setup-birds
   setup-patches
   reset-ticks
@@ -15,7 +16,10 @@ end
 
 to setup-patches
   ask patches [
-    set pcolor green
+    ;set noise_level random-float 1 ; for now setting random noise in the background
+    set noise_level pxcor / 32 ; the value of the noise depends on the patch position, scale it from 0 to 1
+    ;set noise_level 1
+    set pcolor scale-color green noise_level 0 1
   ]
 end
 
@@ -32,11 +36,14 @@ to setup-birds
     set color blue
     set mated FALSE
   ]
-
+  ; this should put the maes in order
+  foreach ( range 0 32 ) [
+    x -> ask one-of males [setxy x ycor]
+  ]
 end
 
 to go
-  if ticks > 100 [
+  if ticks > n_ticks [
     stop
   ]
   tick
@@ -44,21 +51,52 @@ to go
 end
 
 to attracted_song
-  ask females [
+  ask females with [mated = FALSE] [
     ; check if there is a male in certain radius that is singing
-    ifelse any? males with [singing = TRUE] in-radius 3 [
-      let closest_signing_male min-one-of males with [singing = TRUE] in-radius 3 [distance myself]
-      if distance closest_signing_male < 1 [
-          ask  closest_signing_male[
-          set mated closest_signing_male
+    let closest_male min-one-of males
+          with [singing = TRUE]
+          with [mated = FALSE]
+          ; max radius where can hear male song
+          in-radius 3
+          ; sort by distance from female
+          [distance myself]
+
+
+    ifelse closest_male != nobody [
+
+
+      let here_noise_level [noise_level] of patch-here
+
+      ; there is a probability 1 - noise level that the female will hear the male and go in that direction
+      ; goes into the direction of the male
+      ifelse random-float 1 < ( 1 - here_noise_level) [
+        print (word "going towards" [who] of closest_male)
+        face closest_male
+      ]
+      [
+      ; else go into a random direction as the male was not heard
+      print (word "cannot hear male" [who] of closest_male)
+      right random 360
+      ]
+
+      ; close enough to mate
+      if distance closest_male < 1 [
+
+        ; should they create a nest after mating?
+        ask  closest_male[
+          set mated myself
+          ; males stops singing after mating
+          set singing FALSE
+          set color yellow
         ]
-        ask female_bird [
-          set mated male_bird
-        ]
+
+        move-to closest_male
+        set mated closest_male
+        set color yellow
+        ; stops the rountine here, it shouldn't move
         stop
       ]
-      ; goes into the direction of the male
-      face closest_signing_male
+
     ]
     [ ; else go into a random direction
       right random 360
@@ -68,9 +106,7 @@ to attracted_song
 
 end
 
-to-report is_available_mating [bird]
 
-end
 ; mates male and female
 to mate [male_bird female_bird]
   ask male_bird [
@@ -80,8 +116,6 @@ to mate [male_bird female_bird]
     set mated male_bird
   ]
 end
-
-
 @#$#@#$#@
 GRAPHICS-WINDOW
 593
@@ -100,12 +134,12 @@ GRAPHICS-WINDOW
 1
 1
 1
--16
-16
--16
-16
 0
+32
 0
+32
+1
+1
 1
 ticks
 30.0
@@ -192,7 +226,7 @@ n_birds
 n_birds
 0
 40
-6.0
+18.0
 1
 1
 NIL
@@ -234,6 +268,17 @@ start_prob_success
 1
 NIL
 HORIZONTAL
+
+INPUTBOX
+72
+479
+345
+539
+n_ticks
+100.0
+1
+0
+Number
 
 @#$#@#$#@
 ## WHAT IS IT?
