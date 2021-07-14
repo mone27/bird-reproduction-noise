@@ -17,8 +17,8 @@ end
 to setup-patches
   ask patches [
     ;set noise_level random-float 1 ; for now setting random noise in the background
-    set noise_level pxcor / 32 ; the value of the noise depends on the patch position, scale it from 0 to 1
-    ;set noise_level 1
+    ;set noise_level pxcor / 50 ; the value of the noise depends on the patch position, scale it from 0 to 1
+    set noise_level background_noise_level
     set pcolor scale-color green noise_level 0 1
   ]
 end
@@ -57,7 +57,7 @@ to attracted_song
           with [singing = TRUE]
           with [mated = FALSE]
           ; max radius where can hear male song
-          in-radius 3
+          in-radius song_radius
           ; sort by distance from female
           [distance myself]
 
@@ -70,17 +70,17 @@ to attracted_song
       ; there is a probability 1 - noise level that the female will hear the male and go in that direction
       ; goes into the direction of the male
       ifelse random-float 1 < ( 1 - here_noise_level) [
-        print (word "going towards" [who] of closest_male)
+        ;print (word "going towards" [who] of closest_male)
         face closest_male
       ]
       [
       ; else go into a random direction as the male was not heard
-      print (word "cannot hear male" [who] of closest_male)
+      ;print (word "cannot hear male" [who] of closest_male)
       right random 360
       ]
 
       ; close enough to mate
-      if distance closest_male < 1 [
+      if distance closest_male < step_length [
 
         ; should they create a nest after mating?
         ask  closest_male[
@@ -101,7 +101,7 @@ to attracted_song
     [ ; else go into a random direction
       right random 360
     ]
-    forward 1
+    forward step_length
   ]
 
 end
@@ -120,8 +120,8 @@ end
 GRAPHICS-WINDOW
 593
 10
-1030
-448
+1264
+682
 -1
 -1
 13.0
@@ -135,9 +135,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-32
+50
 0
-32
+50
 1
 1
 1
@@ -145,10 +145,10 @@ ticks
 30.0
 
 BUTTON
-38
-17
-112
-50
+41
+41
+114
+76
 setup
 setup
 NIL
@@ -162,10 +162,10 @@ NIL
 1
 
 BUTTON
-149
-17
-212
-50
+143
+43
+206
+76
 NIL
 go
 T
@@ -179,10 +179,10 @@ NIL
 1
 
 BUTTON
-253
-16
-317
-49
+244
+43
+308
+76
 step
 go
 NIL
@@ -195,28 +195,6 @@ NIL
 NIL
 1
 
-INPUTBOX
-55
-91
-216
-151
-clutch_size
-2.0
-1
-0
-Number
-
-INPUTBOX
-262
-90
-423
-150
-noise_pollution
-0.0
-1
-0
-Number
-
 SLIDER
 38
 194
@@ -226,59 +204,103 @@ n_birds
 n_birds
 0
 40
-18.0
+10.0
 1
 1
 NIL
 HORIZONTAL
 
 INPUTBOX
-265
-197
-426
-257
-nest_energy_requirement
-700.0
-1
-0
-Number
-
-INPUTBOX
-50
-308
-211
-368
-feeding_hour
-1000.0
+335
+51
+422
+111
+n_ticks
+200.0
 1
 0
 Number
 
 SLIDER
-56
-415
-253
-448
-start_prob_success
-start_prob_success
+37
+244
+265
+277
+background_noise_level
+background_noise_level
 0
-100
-0.0
 1
+1.0
+.1
 1
 NIL
 HORIZONTAL
 
-INPUTBOX
-72
-479
-345
-539
-n_ticks
-100.0
-1
+PLOT
+48
+342
+248
+492
+number of couples
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -16777216 true "" "plot count males with [mated != FALSE]"
+
+PLOT
+48
+519
+248
+669
+Fraction of couples
+NIL
+NIL
+0.0
+1.0
+0.0
+1.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -16777216 true "" "plot count males with [mated != FALSE] / count males"
+
+SLIDER
+332
+184
+504
+217
+step_length
+step_length
 0
-Number
+5
+2.0
+.5
+1
+NIL
+HORIZONTAL
+
+SLIDER
+332
+244
+504
+277
+song_radius
+song_radius
+0
+6
+6.0
+1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -626,6 +648,26 @@ NetLogo 6.1.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
+<experiments>
+  <experiment name="First model sensitivity analysis" repetitions="1" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>count males with [mated != FALSE] / count males</metric>
+    <steppedValueSet variable="background_noise_level" first="0" step="0.2" last="1"/>
+    <enumeratedValueSet variable="n_ticks">
+      <value value="50"/>
+      <value value="100"/>
+      <value value="200"/>
+    </enumeratedValueSet>
+    <steppedValueSet variable="song_radius" first="1" step="1" last="6"/>
+    <enumeratedValueSet variable="step_length">
+      <value value="0.5"/>
+      <value value="1"/>
+      <value value="2"/>
+    </enumeratedValueSet>
+    <steppedValueSet variable="n_birds" first="10" step="10" last="50"/>
+  </experiment>
+</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default
