@@ -29,6 +29,7 @@ to setup-birds
     set color red
     set singing TRUE
     set mated FALSE
+    pen-down
   ]
   create-females n_birds [
     setxy random-pxcor random-pycor
@@ -37,9 +38,9 @@ to setup-birds
     set mated FALSE
   ]
   ; this should put the maes in order
-  foreach ( range 0 32 ) [
-    x -> ask one-of males [setxy x ycor]
-  ]
+  ;foreach ( range 0 32 ) [
+    ;x -> ask one-of males [setxy x ycor]
+  ;]
 end
 
 to go
@@ -48,6 +49,14 @@ to go
   ]
   tick
   attracted_song
+  move_males
+end
+
+to move_males
+  ask males with [mated = FALSE] [
+    right random 360
+    forward step_length
+  ]
 end
 
 to attracted_song
@@ -204,7 +213,7 @@ n_birds
 n_birds
 0
 40
-10.0
+50.0
 1
 1
 NIL
@@ -649,7 +658,7 @@ NetLogo 6.1.1
 @#$#@#$#@
 @#$#@#$#@
 <experiments>
-  <experiment name="First model sensitivity analysis" repetitions="1" runMetricsEveryStep="false">
+  <experiment name="First model sensitivity analysis" repetitions="20" runMetricsEveryStep="false">
     <setup>setup</setup>
     <go>go</go>
     <metric>count males with [mated != FALSE] / count males</metric>
