@@ -90,20 +90,21 @@ to attracted_song
 
       ; close enough to mate
       if distance closest_male < step_length [
+        mate self closest_male
 
         ; should they create a nest after mating?
-        ask  closest_male[
-          set mated myself
+        ;ask  closest_male[
+         ; set mated myself
           ; males stops singing after mating
-          set singing FALSE
-          set color yellow
-        ]
+         ; set singing FALSE
+         ; set color yellow
+        ;]
 
-        move-to closest_male
-        set mated closest_male
-        set color yellow
+        ;move-to closest_male
+        ;set mated closest_male
+        ;set color yellow
         ; stops the rountine here, it shouldn't move
-        stop
+        ;stop
       ]
 
     ]
@@ -115,15 +116,20 @@ to attracted_song
 
 end
 
+to mate [femaleb maleb]
+  ask  maleb[
+          set mated femaleb
+          ; males stops singing after mating
+          set singing FALSE
+          set color yellow
+        ]
+  ask femaleb[
+      move-to maleb
+      set mated maleb
+      set color yellow
+  ]
 
-; mates male and female
-to mate [male_bird female_bird]
-  ask male_bird [
-    set mated female_bird
-  ]
-  ask female_bird [
-    set mated male_bird
-  ]
+
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -289,9 +295,9 @@ SLIDER
 step_length
 step_length
 0
-5
-2.0
-.5
+1
+0.5
+.05
 1
 NIL
 HORIZONTAL
@@ -305,8 +311,23 @@ song_radius
 song_radius
 0
 6
-6.0
+4.0
 1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+331
+295
+503
+328
+prob_mating
+prob_mating
+0
+1
+0.5
+.1
 1
 NIL
 HORIZONTAL
@@ -675,6 +696,50 @@ NetLogo 6.1.1
       <value value="2"/>
     </enumeratedValueSet>
     <steppedValueSet variable="n_birds" first="10" step="10" last="50"/>
+  </experiment>
+  <experiment name="step lenght no attraction" repetitions="100" runMetricsEveryStep="true">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>count males with [mated != FALSE] / count males</metric>
+    <enumeratedValueSet variable="background_noise_level">
+      <value value="1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="n_ticks">
+      <value value="200"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="song_radius">
+      <value value="6"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="step_length">
+      <value value="0.5"/>
+      <value value="1"/>
+      <value value="2"/>
+      <value value="3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="n_birds">
+      <value value="50"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="change noise level" repetitions="100" runMetricsEveryStep="true">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>count males with [mated != FALSE]</metric>
+    <steppedValueSet variable="background_noise_level" first="0" step="0.1" last="1"/>
+    <enumeratedValueSet variable="n_ticks">
+      <value value="200"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="song_radius">
+      <value value="4"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="step_length">
+      <value value="0.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="n_birds">
+      <value value="50"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="prob_mating">
+      <value value="0.5"/>
+    </enumeratedValueSet>
   </experiment>
 </experiments>
 @#$#@#$#@
