@@ -2,9 +2,13 @@ breed [males male]
 breed [females female]
 
 patches-own [noise_level]
-males-own [singing mated]
+males-own [singing mated total_noise avg_noise]
 females-own [mated]
 ; consider that every 10 x 10 patches is a home range and there can be up to one couple per home range
+
+; Ideas add singing/noise frequency
+; need to understand how to sum the bird frequency with the
+; energy level for males -> the more noise the louder the need to sing
 
 to setup
   clear-all
@@ -14,48 +18,91 @@ to setup
   reset-ticks
 end
 
+to go
+  tick ; increment ticks at the beginning of the procedure to avoid a 0 tick and hence a division by zero in the average noise procedure
+  if ticks > n_ticks [
+    stop
+  ]
+  attracted_song
+  ; female_move
+  ; mate
+
+  move_males
+  update_male_avg_noise
+end
+
+
 to setup-patches
   ask patches [
     ;set noise_level random-float 1 ; for now setting random noise in the background
     ;set noise_level pxcor / 50 ; the value of the noise depends on the patch position, scale it from 0 to 1
-    set noise_level background_noise_level
+    ;set noise_level background_noise_level
+
+    if noise_distribution = "uniform" [
+      set noise_level background_noise_level
+    ]
+
+    if noise_distribution = "gradient" [
+     set noise_level pxcor / world-width * background_noise_level ; the value of the noise depends on the patch position, scale it from 0 to 1
+    ]
+
+    if noise_distribution = "two-areas" [
+      set noise_level (round (pxcor / world-width)) * background_noise_level ; rounds to either 0 or 1
+    ]
+
     set pcolor scale-color green noise_level 0 1
   ]
 end
 
+
+to space-males-evenly
+  ; calc the number of columns to have a evely spaced males in a square
+  ; uses celiging to make sure that there is enough space for them
+  let num-cols ceiling sqrt count males
+  let num-rows num-cols ; same number cols are rows
+  let horizontal-spacing (world-width / num-cols)
+  let vertical-spacing (world-height / num-rows)
+  let min-xpos (min-pxcor - 0.5 + horizontal-spacing / 2)
+  let min-ypos (min-pycor - 0.5 + vertical-spacing / 2)
+
+  ask males [
+     let row (floor (who / num-cols))
+     let col (who mod num-cols)
+     pen-up
+     setxy (min-xpos + col * horizontal-spacing)
+           (min-ypos + row * vertical-spacing)
+    pen-down
+   ]
+end
+
+
 to setup-birds
-  create-males n_birds [
+  ; default to random distribution for males
+  create-males n_birds * scaling_factor ^ 2 [
     setxy random-pxcor random-pycor
     set color red
     set singing TRUE
     set mated FALSE
     pen-down
   ]
-  create-females n_birds [
+  ; convert to regular if set up
+  if male_distribution = "regular" [
+    space-males-evenly
+  ]
+
+  create-females n_birds * scaling_factor ^ 2 [
     setxy random-pxcor random-pycor
     pen-down
     set color blue
     set mated FALSE
   ]
-  ; this should put the maes in order
-  ;foreach ( range 0 32 ) [
-    ;x -> ask one-of males [setxy x ycor]
-  ;]
 end
 
-to go
-  if ticks > n_ticks [
-    stop
-  ]
-  tick
-  attracted_song
-  move_males
-end
 
 to move_males
   ask males with [mated = FALSE] [
     right random 360
-    forward step_length
+    forward (step_length / 2 ) / scaling_factor
   ]
 end
 
@@ -66,7 +113,7 @@ to attracted_song
           with [singing = TRUE]
           with [mated = FALSE]
           ; max radius where can hear male song
-          in-radius song_radius
+          in-radius ( song_radius / scaling_factor )
           ; sort by distance from female
           [distance myself]
 
@@ -89,8 +136,21 @@ to attracted_song
       ]
 
       ; close enough to mate
-      if distance closest_male < step_length [
-        mate self closest_male
+      if distance closest_male < step_length / scaling_factor [
+        ; the female decides to mate
+        ifelse random-float 1 < prob_mating [
+          mate self closest_male
+          print (word who " mated with" [who] of closest_male)
+        ]
+        ; else decides that the male is not interesting and moves away
+        ; for now more than the song radius to it doesn't get attracted
+        [
+          face closest_male
+          right 180 ; goes into opposite direction of male
+          forward song_radius / scaling_factor + 2 * step_length / scaling_factor
+          print (word who " moving away from " [who] of closest_male)
+        ]
+
 
         ; should they create a nest after mating?
         ;ask  closest_male[
@@ -109,9 +169,9 @@ to attracted_song
 
     ]
     [ ; else go into a random direction
-      right random 360
+      right random 180
     ]
-    forward step_length
+    forward step_length / scaling_factor
   ]
 
 end
@@ -128,15 +188,44 @@ to mate [femaleb maleb]
       set mated maleb
       set color yellow
   ]
+end
 
+to update_male_avg_noise
+  ask males [
+    set total_noise total_noise + [noise_level] of patch-here
+    set avg_noise total_noise / ticks
+  ]
+end
 
+; Need for plotting
+
+; This reporter is needed to handle the edge case when the are no mated males and the mean should be 0 instead of producing an error
+to-report total_avg_noise_mated
+  let avg_noise_mated [avg_noise] of males with [mated != FALSE] ; getting the avg_noise of all mated males
+  ifelse not empty? avg_noise_mated [
+    report mean avg_noise_mated ; mean doesn't work on empty lists
+  ]
+  [
+    report 0 ; default value in case there are no mated males
+  ]
+end
+
+; Same of the previous reporter but for not mated males
+to-report total_avg_noise_not_mated
+  let avg_noise_not_mated [avg_noise] of males with [mated = FALSE] ; getting the avg_noise of all mated males
+  ifelse not empty? avg_noise_not_mated [
+    report mean avg_noise_not_mated ; mean doesn't work on empty lists
+  ]
+  [
+    report 0 ; default value in case there are no mated males
+  ]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-593
-10
-1264
-682
+1114
+16
+1785
+688
 -1
 -1
 13.0
@@ -218,8 +307,8 @@ SLIDER
 n_birds
 n_birds
 0
-40
-50.0
+100
+64.0
 1
 1
 NIL
@@ -231,7 +320,7 @@ INPUTBOX
 422
 111
 n_ticks
-200.0
+100.0
 1
 0
 Number
@@ -245,7 +334,7 @@ background_noise_level
 background_noise_level
 0
 1
-1.0
+0.7
 .1
 1
 NIL
@@ -288,49 +377,155 @@ PENS
 "default" 1.0 0 -16777216 true "" "plot count males with [mated != FALSE] / count males"
 
 SLIDER
-332
-184
-504
-217
+319
+129
+491
+162
 step_length
 step_length
 0
 1
-0.5
+0.65
 .05
 1
 NIL
 HORIZONTAL
 
 SLIDER
-332
-244
-504
-277
+319
+178
+491
+211
 song_radius
 song_radius
 0
-6
-4.0
+4
+3.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-331
-295
-503
-328
+318
+229
+490
+262
 prob_mating
 prob_mating
 0
 1
-0.5
+0.6
 .1
 1
 NIL
 HORIZONTAL
+
+MONITOR
+286
+520
+424
+565
+Fraction of couples
+count males with [mated != FALSE] / count males
+2
+1
+11
+
+MONITOR
+271
+445
+409
+490
+Number of couples
+count males with [mated != FALSE]
+0
+1
+11
+
+SWITCH
+38
+136
+182
+169
+males_move
+males_move
+0
+1
+-1000
+
+SLIDER
+314
+404
+486
+437
+scaling_factor
+scaling_factor
+1
+5
+1.0
+1
+1
+NIL
+HORIZONTAL
+
+CHOOSER
+316
+289
+464
+334
+male_distribution
+male_distribution
+"random" "regular"
+1
+
+CHOOSER
+317
+347
+469
+392
+noise_distribution
+noise_distribution
+"uniform" "gradient" "two-areas"
+1
+
+PLOT
+317
+574
+650
+805
+plot 1
+Males average noise
+Number of males
+0.0
+10.0
+0.0
+10.0
+true
+true
+"set-plot-x-range 0 1\nset-plot-y-range 0 n_birds / 10\nset-histogram-num-bars 3" ""
+PENS
+"Mated" 1.0 1 -5298144 true "" "histogram [avg_noise] of males with [mated = FALSE]"
+"Not mated" 1.0 1 -15390905 true "set-histogram-num-bars 3" "histogram [avg_noise] of males with [mated != FALSE]"
+
+PLOT
+629
+50
+829
+200
+plot 2
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"default" 1.0 1 -16777216 true "" "plotxy 1 mean [avg_noise] of males with [mated = FALSE]"
+"pen-1" 1.0 0 -7500403 true "" "plotxy 2 mean [avg_noise] of males with [mated != FALSE]"
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -723,7 +918,7 @@ NetLogo 6.1.1
   <experiment name="change noise level" repetitions="100" runMetricsEveryStep="true">
     <setup>setup</setup>
     <go>go</go>
-    <metric>count males with [mated != FALSE]</metric>
+    <metric>count males with [mated != FALSE] / count males</metric>
     <steppedValueSet variable="background_noise_level" first="0" step="0.1" last="1"/>
     <enumeratedValueSet variable="n_ticks">
       <value value="200"/>
