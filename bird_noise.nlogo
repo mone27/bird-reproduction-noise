@@ -1,18 +1,21 @@
 breed [males male]
 breed [females female]
 
-patches-own [noise_level]
-males-own [singing mated total_noise avg_noise]
-females-own [mated]
-; consider that every 10 x 10 patches is a home range and there can be up to one couple per home range
 
-; Ideas add singing/noise frequency
-; need to understand how to sum the bird frequency with the
-; energy level for males -> the more noise the louder the need to sing
+patches-own [noise_level]
+males-own [
+  mated ; whether males mated either FALSE or the who number of the female
+  total_noise ; total noise exposed before mating
+  avg_noise ; average noise exposed before mating
+  time_mating ; when they mate
+]
+females-own [mated] ; whether are mated either FALSE or the who number of the male
+
+
+; ------ core routines ----------
 
 to setup
   clear-all
-  ;random-seed 1501 ;set random seed for reproducibility
   setup-birds
   setup-patches
   reset-ticks
@@ -20,201 +23,239 @@ end
 
 to go
   tick ; increment ticks at the beginning of the procedure to avoid a 0 tick and hence a division by zero in the average noise procedure
-  if ticks > n_ticks [
+  if ticks > n_ticks [ ; stops afer the number of ticks
     stop
   ]
-  attracted_song
-  ; female_move
-  ; mate
+  song_attraction
+  females_move
+  females_mate
 
-  move_males
+  males_move
   update_male_avg_noise
 end
 
 
+
+; ------------ SETUP --------------------
+
+; setup the patches background noise according to the noise_distribution and the background_noise_level
 to setup-patches
   ask patches [
-    ;set noise_level random-float 1 ; for now setting random noise in the background
-    ;set noise_level pxcor / 50 ; the value of the noise depends on the patch position, scale it from 0 to 1
-    ;set noise_level background_noise_level
 
+    ; all the patches have the same amount of noise
     if noise_distribution = "uniform" [
       set noise_level background_noise_level
     ]
 
+    ; there is a gradient from the left side of the world to the right, going from noise 0 to background_noise_level
     if noise_distribution = "gradient" [
-     set noise_level pxcor / world-width * background_noise_level ; the value of the noise depends on the patch position, scale it from 0 to 1
+      set noise_level pxcor / world-width * background_noise_level ; pxcor / world-width gives a fraction on how far on the right the patch is, then is scaled using the background_noise_level
     ]
 
+    ; The world is divided "vertically" in two sections one with 0 background noise and the other there is a background_noise_level
     if noise_distribution = "two-areas" [
-      set noise_level (round (pxcor / world-width)) * background_noise_level ; rounds to either 0 or 1
+      set noise_level (round (pxcor / world-width)) * background_noise_level ; round (pxcor / world-width) will return 0 for the first half and 1 for the second half in this way there are two distinct areas
     ]
 
+    ; random distribution: each patch has its own value of background noise ranging from 0 to background_noise_level
+    if noise_distribution = "random" [
+      set noise_level random-float 1 * background_noise_level
+    ]
+    ; For visualization purposes sets the color of the patch on green scale color, when the noise is 0 the patch would be black, when is 1 white and for all the values in between of different shades of green.
     set pcolor scale-color green noise_level 0 1
   ]
 end
 
-
-to space-males-evenly
+; put the males into a regular grid
+to space_males_evenly
   ; calc the number of columns to have a evely spaced males in a square
   ; uses celiging to make sure that there is enough space for them
+  ; in the case the number of males is not a perfect square there will be some empty spots in the grid
   let num-cols ceiling sqrt count males
   let num-rows num-cols ; same number cols are rows
+
   let horizontal-spacing (world-width / num-cols)
   let vertical-spacing (world-height / num-rows)
+
+  ; add some padding on left and right
   let min-xpos (min-pxcor - 0.5 + horizontal-spacing / 2)
   let min-ypos (min-pycor - 0.5 + vertical-spacing / 2)
 
   ask males [
-     let row (floor (who / num-cols))
+     let row (floor (who / num-cols)) ; uses the who number as a way to tell the different males apart
      let col (who mod num-cols)
-     pen-up
      setxy (min-xpos + col * horizontal-spacing)
            (min-ypos + row * vertical-spacing)
-    pen-down
    ]
 end
 
-
+; creates females and males birds and initalizse their position
 to setup-birds
-  ; default to random distribution for males
+
   create-males n_birds * scaling_factor ^ 2 [
+
+    ; by default random distribution for males
     setxy random-pxcor random-pycor
-    set color red
-    set singing TRUE
-    set mated FALSE
-    pen-down
+
+    set mated FALSE ; at the beginning no male is mated
+    set  total_noise 0; init tracking variables to 0
+    set avg_noise 0 ;
+    set time_mating 0 ;
+
+    set color orange - 1
+    set shape "bird side"
   ]
-  ; convert to regular if set up
+
+  ; if distribution is regular put the on the grid
   if male_distribution = "regular" [
-    space-males-evenly
+    space_males_evenly
   ]
 
+  ; create females
   create-females n_birds * scaling_factor ^ 2 [
-    setxy random-pxcor random-pycor
-    pen-down
-    set color blue
-    set mated FALSE
+    setxy random-pxcor random-pycor ; random distribution is the only option
+
+    set mated FALSE ; at the beginning no female is mated
+
+    set color cyan - 1
+    set shape "bird side"
   ]
 end
 
+; ------------ Females --------------------
 
-to move_males
-  ask males with [mated = FALSE] [
-    right random 360
-    forward (step_length / 2 ) / scaling_factor
-  ]
-end
-
-to attracted_song
+to song_attraction
   ask females with [mated = FALSE] [
     ; check if there is a male in certain radius that is singing
     let closest_male min-one-of males
-          with [singing = TRUE]
           with [mated = FALSE]
           ; max radius where can hear male song
           in-radius ( song_radius / scaling_factor )
           ; sort by distance from female
           [distance myself]
 
+    let here_noise_level [noise_level] of patch-here ; get current path noise level
 
-    ifelse closest_male != nobody [
-
-
-      let here_noise_level [noise_level] of patch-here
-
-      ; there is a probability 1 - noise level that the female will hear the male and go in that direction
-      ; goes into the direction of the male
-      ifelse random-float 1 < ( 1 - here_noise_level) [
-        ;print (word "going towards" [who] of closest_male)
-        face closest_male
-      ]
-      [
-      ; else go into a random direction as the male was not heard
-      ;print (word "cannot hear male" [who] of closest_male)
-      right random 360
-      ]
-
-      ; close enough to mate
-      if distance closest_male < step_length / scaling_factor [
-        ; the female decides to mate
-        ifelse random-float 1 < prob_mating [
-          mate self closest_male
-          print (word who " mated with" [who] of closest_male)
-        ]
-        ; else decides that the male is not interesting and moves away
-        ; for now more than the song radius to it doesn't get attracted
-        [
-          face closest_male
-          right 180 ; goes into opposite direction of male
-          forward song_radius / scaling_factor + 2 * step_length / scaling_factor
-          print (word who " moving away from " [who] of closest_male)
-        ]
-
-
-        ; should they create a nest after mating?
-        ;ask  closest_male[
-         ; set mated myself
-          ; males stops singing after mating
-         ; set singing FALSE
-         ; set color yellow
-        ;]
-
-        ;move-to closest_male
-        ;set mated closest_male
-        ;set color yellow
-        ; stops the rountine here, it shouldn't move
-        ;stop
-      ]
-
+    ; there is a probability 1 - noise level that the female will hear the male and go in that direction
+    ; if so goes into the direction of the male
+    ; plus need to check that there is at least one male otherwise the face command will fail
+    ifelse random-float 1 < ( 1 - here_noise_level) and (closest_male != nobody)
+    [
+       face closest_male
     ]
-    [ ; else go into a random direction
+    ; else go into a random direction in the range 0-180
+    [
       right random 180
     ]
+  ]
+
+end
+
+
+to females_move
+  ask females with [mated = FALSE]
+  [
     forward step_length / scaling_factor
   ]
-
 end
 
-to mate [femaleb maleb]
-  ask  maleb[
-          set mated femaleb
-          ; males stops singing after mating
-          set singing FALSE
-          set color yellow
+
+to females_mate
+   ask females with [mated = FALSE] [
+
+    ; check if there is a male in certain radius that is singing
+    let closest_male min-one-of males
+          with [mated = FALSE]
+          ; max radius where can hear male song
+          in-radius ( song_radius / scaling_factor )
+          ; sort by distance from female
+          [distance myself]
+
+      if closest_male != nobody [ ; needed to check that there is a male otherwise next condition will fail at runtime
+        ; if male is close enough can mate
+        if distance closest_male < step_length / scaling_factor [
+
+          ; the female decides to mate with a prob_mating
+          ifelse random-float 1 < prob_mating [
+            mate self closest_male
+          ]
+          ; else decides that the male is not interesting and moves away
+          ; move for more than the song radius to it doesn't get attracted again at the next step
+          [
+            ; goes into opposite direction of male
+            face closest_male
+            right 180
+            ; moves away
+            forward song_radius / scaling_factor + 2 * step_length / scaling_factor
+          ]
         ]
-  ask femaleb[
-      move-to maleb
-      set mated maleb
-      set color yellow
+      ]
+
   ]
 end
 
+
+; procedure that given a male and females mates them together
+to mate [femaleb maleb]
+  ask  maleb
+  [
+     set mated femaleb ; set the mated status
+
+     set color violet - 1 ; set to mated colour
+     set time_mating ticks
+   ]
+  ask femaleb[
+     move-to maleb ; move exactly to the male so they fully overlap
+     set mated maleb
+
+     set color violet - 1 ; set to mated colour
+  ]
+end
+
+
+; ------------ Males --------------------
+
+; moves the male
+to males_move
+  ask males with [mated = FALSE] [ ; only to not mated males
+    ; this function allows males to move a bit but they won't change their position too much (small step size and random direction 0-360)
+    right random 360 ; change to random direction in range 0-360
+    forward (step_length / 2 ) / scaling_factor ; go ahead of half a step
+  ]
+end
+
+; update the total and avg noise
 to update_male_avg_noise
-  ask males [
+  ask males with [mated = FALSE] ; The average noise needs to be updated only for males who are not mated yet, othe
+  [
     set total_noise total_noise + [noise_level] of patch-here
     set avg_noise total_noise / ticks
   ]
 end
 
-; Need for plotting
 
-; This reporter is needed to handle the edge case when the are no mated males and the mean should be 0 instead of producing an error
-to-report total_avg_noise_mated
-  let avg_noise_mated [avg_noise] of males with [mated != FALSE] ; getting the avg_noise of all mated males
-  ifelse not empty? avg_noise_mated [
-    report mean avg_noise_mated ; mean doesn't work on empty lists
+
+; ------------ Plotting ----------------
+
+; Utility functions needed for plotting
+
+; get the avg_noise for mated or not mated. Simple reporter to make next code easier
+to-report get_avg_noise [mated?]
+  ifelse mated?
+  [
+    report [avg_noise] of males with [mated != FALSE]
   ]
   [
-    report 0 ; default value in case there are no mated males
+    report [avg_noise] of males with [mated = FALSE]
   ]
 end
 
-; Same of the previous reporter but for not mated males
-to-report total_avg_noise_not_mated
-  let avg_noise_not_mated [avg_noise] of males with [mated = FALSE] ; getting the avg_noise of all mated males
-  ifelse not empty? avg_noise_not_mated [
-    report mean avg_noise_not_mated ; mean doesn't work on empty lists
+; This reporter is needed to handle the edge case when the are no mated males and the mean should be 0 instead of producing an error
+; depending on the value of mated returns either the average of either mated or not mated males
+to-report global_avg_noise [mated?]
+  let males_avg_noise get_avg_noise mated?  ; getting the avg_noise of all mated males
+  ifelse not empty? males_avg_noise [
+    report mean males_avg_noise ; mean doesn't work on empty lists
   ]
   [
     report 0 ; default value in case there are no mated males
@@ -235,7 +276,7 @@ GRAPHICS-WINDOW
 1
 1
 0
-1
+0
 1
 1
 0
@@ -308,7 +349,7 @@ n_birds
 n_birds
 0
 100
-64.0
+100.0
 1
 1
 NIL
@@ -320,7 +361,7 @@ INPUTBOX
 422
 111
 n_ticks
-100.0
+30.0
 1
 0
 Number
@@ -334,7 +375,7 @@ background_noise_level
 background_noise_level
 0
 1
-0.7
+0.9
 .1
 1
 NIL
@@ -385,7 +426,7 @@ step_length
 step_length
 0
 1
-0.65
+0.35
 .05
 1
 NIL
@@ -415,7 +456,7 @@ prob_mating
 prob_mating
 0
 1
-0.6
+0.7
 .1
 1
 NIL
@@ -443,17 +484,6 @@ count males with [mated != FALSE]
 1
 11
 
-SWITCH
-38
-136
-182
-169
-males_move
-males_move
-0
-1
--1000
-
 SLIDER
 314
 404
@@ -477,7 +507,7 @@ CHOOSER
 male_distribution
 male_distribution
 "random" "regular"
-1
+0
 
 CHOOSER
 317
@@ -486,7 +516,7 @@ CHOOSER
 392
 noise_distribution
 noise_distribution
-"uniform" "gradient" "two-areas"
+"uniform" "gradient" "two-areas" "random"
 1
 
 PLOT
@@ -503,16 +533,35 @@ Number of males
 10.0
 true
 true
-"set-plot-x-range 0 1\nset-plot-y-range 0 n_birds / 10\nset-histogram-num-bars 3" ""
+"set-plot-x-range 0 1\nset-plot-y-range 0 n_birds / 10\n" ""
 PENS
-"Mated" 1.0 1 -5298144 true "" "histogram [avg_noise] of males with [mated = FALSE]"
-"Not mated" 1.0 1 -15390905 true "set-histogram-num-bars 3" "histogram [avg_noise] of males with [mated != FALSE]"
+"Mated" 1.0 1 -10141563 true "set-histogram-num-bars 4" "histogram [avg_noise] of males with [mated != FALSE]"
+"Not mated" 1.0 1 -3844592 true "set-histogram-num-bars 4" "histogram [avg_noise] of males with [mated = FALSE]"
 
 PLOT
 629
 50
-829
-200
+1037
+312
+Average noise for mated and not mated males
+time
+Average noise
+0.0
+6.0
+0.0
+1.0
+true
+true
+"" ""
+PENS
+"Mated" 1.0 0 -10141563 true "" "plot global_avg_noise TRUE"
+"Not mated" 1.0 0 -817084 true "" "plot global_avg_noise FALSE"
+
+PLOT
+787
+434
+987
+584
 plot 2
 NIL
 NIL
@@ -522,10 +571,20 @@ NIL
 10.0
 true
 false
-"" ""
+"set-plot-x-range 0 n_ticks\nset-histogram-num-bars 10" ""
 PENS
-"default" 1.0 1 -16777216 true "" "plotxy 1 mean [avg_noise] of males with [mated = FALSE]"
-"pen-1" 1.0 0 -7500403 true "" "plotxy 2 mean [avg_noise] of males with [mated != FALSE]"
+"default" 1.0 1 -16777216 true "" "histogram [time_mating] of males with [time_mating != 0]"
+
+MONITOR
+595
+446
+736
+491
+Averge mating time
+mean [time_mating] of males with [time_mating != 0]
+2
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -578,6 +637,12 @@ arrow
 true
 0
 Polygon -7500403 true true 150 0 0 150 105 150 105 293 195 293 195 150 300 150
+
+bird side
+false
+0
+Polygon -7500403 true true 0 120 45 90 75 90 105 120 150 120 240 135 285 120 285 135 300 150 240 150 195 165 255 195 210 195 150 210 90 195 60 180 45 135
+Circle -16777216 true false 38 98 14
 
 box
 false
