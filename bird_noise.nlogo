@@ -145,7 +145,7 @@ to song_attraction
     ]
     ; else go into a random direction in the range 0-180
     [
-      right random 180
+      right random 90
     ]
   ]
 
@@ -263,10 +263,10 @@ to-report global_avg_noise [mated?]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-1114
-16
-1785
-688
+265
+11
+936
+683
 -1
 -1
 13.0
@@ -290,10 +290,10 @@ ticks
 30.0
 
 BUTTON
-41
-41
-114
-76
+39
+59
+226
+94
 setup
 setup
 NIL
@@ -307,10 +307,10 @@ NIL
 1
 
 BUTTON
+38
+110
+161
 143
-43
-206
-76
 NIL
 go
 T
@@ -324,10 +324,10 @@ NIL
 1
 
 BUTTON
-244
-43
-308
-76
+168
+111
+223
+144
 step
 go
 NIL
@@ -342,68 +342,50 @@ NIL
 
 SLIDER
 38
-194
-210
-227
+158
+228
+191
 n_birds
 n_birds
 0
 100
-100.0
+99.0
 1
 1
 NIL
 HORIZONTAL
 
 INPUTBOX
-335
-51
-422
-111
+39
+598
+215
+658
 n_ticks
-30.0
+100.0
 1
 0
 Number
 
 SLIDER
-37
-244
-265
-277
+36
+206
+228
+239
 background_noise_level
 background_noise_level
 0
 1
-0.9
+0.8
 .1
 1
 NIL
 HORIZONTAL
 
 PLOT
-48
-342
-248
-492
-number of couples
-NIL
-NIL
-0.0
-10.0
-0.0
-10.0
-true
-false
-"" ""
-PENS
-"default" 1.0 0 -16777216 true "" "plot count males with [mated != FALSE]"
-
-PLOT
-48
-519
-248
-669
+1209
+10
+1409
+160
 Fraction of couples
 NIL
 NIL
@@ -418,25 +400,25 @@ PENS
 "default" 1.0 0 -16777216 true "" "plot count males with [mated != FALSE] / count males"
 
 SLIDER
-319
-129
-491
-162
+37
+254
+229
+287
 step_length
 step_length
 0
 1
-0.35
+0.25
 .05
 1
 NIL
 HORIZONTAL
 
 SLIDER
-319
-178
-491
-211
+38
+301
+227
+334
 song_radius
 song_radius
 0
@@ -448,10 +430,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-318
-229
-490
-262
+36
+351
+225
+384
 prob_mating
 prob_mating
 0
@@ -463,10 +445,10 @@ NIL
 HORIZONTAL
 
 MONITOR
-286
-520
-424
-565
+1243
+205
+1381
+250
 Fraction of couples
 count males with [mated != FALSE] / count males
 2
@@ -474,10 +456,10 @@ count males with [mated != FALSE] / count males
 11
 
 MONITOR
-271
-445
-409
-490
+1469
+159
+1607
+204
 Number of couples
 count males with [mated != FALSE]
 0
@@ -485,10 +467,10 @@ count males with [mated != FALSE]
 11
 
 SLIDER
-314
-404
-486
-437
+36
+545
+220
+578
 scaling_factor
 scaling_factor
 1
@@ -500,30 +482,30 @@ NIL
 HORIZONTAL
 
 CHOOSER
-316
-289
-464
-334
+37
+402
+222
+447
 male_distribution
 male_distribution
 "random" "regular"
-0
+1
 
 CHOOSER
-317
-347
-469
-392
+37
+467
+220
+512
 noise_distribution
 noise_distribution
 "uniform" "gradient" "two-areas" "random"
 1
 
 PLOT
-317
-574
-650
-805
+1131
+824
+1464
+1055
 plot 1
 Males average noise
 Number of males
@@ -539,10 +521,10 @@ PENS
 "Not mated" 1.0 1 -3844592 true "set-histogram-num-bars 4" "histogram [avg_noise] of males with [mated = FALSE]"
 
 PLOT
-629
-50
-1037
-312
+1164
+586
+1572
+848
 Average noise for mated and not mated males
 time
 Average noise
@@ -558,10 +540,10 @@ PENS
 "Not mated" 1.0 0 -817084 true "" "plot global_avg_noise FALSE"
 
 PLOT
-787
-434
-987
-584
+1068
+342
+1268
+492
 plot 2
 NIL
 NIL
@@ -576,10 +558,10 @@ PENS
 "default" 1.0 1 -16777216 true "" "histogram [time_mating] of males with [time_mating != 0]"
 
 MONITOR
-595
-446
-736
-491
+1544
+89
+1685
+134
 Averge mating time
 mean [time_mating] of males with [time_mating != 0]
 2
